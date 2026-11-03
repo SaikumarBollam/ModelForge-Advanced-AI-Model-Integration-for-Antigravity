@@ -1,0 +1,57 @@
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      MODELFORGE_MASTER_KEY: ${MODELFORGE_MASTER_KEY:?set a 32+ char master key}
+      MODELFORGE_GATEWAY_API_KEY: ${MODELFORGE_GATEWAY_API_KEY:-}
+      MODELFORGE_ADMIN_API_KEY: ${MODELFORGE_ADMIN_API_KEY:-}
+    volumes:
+      - modelforge-data:/data
+    restart: unless-stopped
+
+  # Optional profile: PostgreSQL + Redis for multi-instance deployments.
+  # The standalone gateway uses the embedded JSON store; the Drizzle-backed
+  # store is tracked in ROADMAP.md (Phase 6).
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["infra"]
+    environment:
+      POSTGRES_DB: modelforge
+      POSTGRES_USER: modelforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-modelforge-dev}
+    volumes:
+      - modelforge-pg:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["infra"]
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: ["monitoring"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  modelforge-data:
+  modelforge-pg:
