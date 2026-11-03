@@ -410,11 +410,26 @@ export async function buildGateway(overrides: Partial<AppConfig> & { fetchFn?: t
   });
 
   // ------------------------------------------------------------- dashboard static files
-  const dashboardDist = join(process.cwd(), 'apps/dashboard/dist');
-  if (existsSync(dashboardDist)) {
+  // Resolve from this file's location, not process.cwd(), so it works
+  // whether the gateway is started from the workspace root or from apps/gateway/.
+  const thisDir = new URL('.', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1').replace(/\/$/, '');
+  // On Windows, import.meta.url is file:///C:/... — strip leading slash for drive-letter paths.
+  const candidates = [
+    join(process.cwd(), 'apps/dashboard/dist'),
+    join(thisDir, '../../dashboard/dist'),
+    join(thisDir, '../dashboard/dist'),
+  ];
+  let dashboardDist: string | undefined;
+  for (const c of candidates) {
+    if (existsSync(c)) { dashboardDist = c; break; }
+  }
+  if (dashboardDist) {
     const fastifyStatic = (await import('@fastify/static')).default;
-    await app.register(fastifyStatic, { root: dashboardDist, prefix: '/ui/' });
+    await app.register(fastifyStatic, { root: dashboardDist, prefix: '/ui/', wildcard: false });
     app.get('/ui', async (_req, reply) => reply.redirect('/ui/'));
+    logger.info('Dashboard static files mounted', { dashboardDist });
+  } else {
+    logger.info('Dashboard not built — run npm run build:dashboard to serve /ui/', { searched: candidates });
   }
 
   logger.info('ModelForge gateway ready', { host: config.host, port: config.port, dataDir: config.dataDir });
