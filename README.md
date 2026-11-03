@@ -1,4 +1,4 @@
-# ModelForge
+# ModelForge — AI Model Integration for Antigravity
 
 **Universal AI Provider Management, Model Gateway & Antigravity Integration Platform**
 
